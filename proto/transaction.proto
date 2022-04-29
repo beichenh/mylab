@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package gitaly;
+
+option go_package = "gitlab.com/gitlab-org/gitaly/v14/proto/go/gitalypb";
+
+import "lint.proto";
+import "shared.proto";
+
+service RefTransaction {
+  option (intercepted) = true;
+
+  rpc VoteTransaction (VoteTransactionRequest) returns (VoteTransactionResponse);
+
+  rpc StopTransaction (StopTransactionRequest) returns (StopTransactionResponse);
+}
+
+message VoteTransactionRequest {
+  enum Phase {
+    // UNKNOWN_PHASE is the unknown voting phase. This value has been the
+    // default because phases have been introduced. Eventually, using this
+    // phase will become unsupported.
+    UNKNOWN_PHASE = 0;
+    // PREPARED_PHASE is the prepratory phase. The data that is about to change
+    // is locked for concurrent modification, but changes have not yet been
+    // written to disk.
+    PREPARED_PHASE = 1;
+    // COMMITTED_PHASE is the committing phase. Data has been committed to disk
+    // and will be visible in all subsequent requests.
+    COMMITTED_PHASE  = 2;
+  };
+
+  Repository repository = 1[(target_repository)=true];
+  // ID of the transaction we're processing
+  uint64 transaction_id = 2;
+  // Name of the Gitaly node that's voting on a transaction.
+  string node = 3;
+  // SHA1 of the references that are to be updated
+  bytes reference_updates_hash = 4;
+  // Phase is the voting phase.
+  Phase phase = 5;
+}
+
+message VoteTransactionResponse {
+  // The outcome of the given transaction telling the client whether the
+  // transaction should be committed or rolled back.
+  enum TransactionState {
+    COMMIT = 0;
+    ABORT = 1;
+    STOP = 2;
+  }
+
+  TransactionState state = 1;
+}
+
+message StopTransactionRequest {
+  Repository repository = 1[(target_repository)=true];
+  // ID of the transaction we're processing
+  uint64 transaction_id = 2;
+}
+
+message StopTransactionResponse {}
